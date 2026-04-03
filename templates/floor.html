@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block title %}{{ floor['name'] }} | Barcode Inventory{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <a href="{{ url_for('index') }}" class="back-link">← Back to floors</a>
+    <h1>{{ floor['name'] }}</h1>
+    <p class="muted">Total unique barcode(s): <strong id="total-count">{{ total_items }}</strong></p>
+  </div>
+
+  <form method="post" action="{{ url_for('delete_floor', floor_id=floor['id']) }}" onsubmit="return confirm('Delete this floor and all its saved barcodes?');">
+    <button type="submit" class="danger">Delete floor</button>
+  </form>
+</div>
+
+<section class="grid two-col">
+  <div class="card">
+    <h2>Scan barcodes</h2>
+    <p class="muted">
+      Click in the input once, then just scan. Most USB barcode scanners type the code and press Enter automatically.
+    </p>
+
+    <form id="scan-form" class="stack-gap">
+      <label for="scan-input">Barcode</label>
+      <input
+        id="scan-input"
+        type="text"
+        placeholder="Scan here..."
+        autocomplete="off"
+        autofocus
+      >
+      <button type="submit">Add barcode</button>
+    </form>
+
+    <div id="scan-message" class="scan-message muted"></div>
+
+    <div class="example-box">
+      <div class="muted small-text">Example scanned value:</div>
+      <code>MMTKVEE00622312A443W01</code>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Saved barcodes</h2>
+    {% if items %}
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Barcode</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="items-body">
+            {% for item in items %}
+              <tr data-barcode="{{ item }}">
+                <td class="row-number">{{ loop.index }}</td>
+                <td><code>{{ item }}</code></td>
+                <td>
+                  <form method="post" action="{{ url_for('delete_item', floor_id=floor['id']) }}" onsubmit="return confirm('Remove barcode {{ item }} from {{ floor['name'] }}?');">
+                    <input type="hidden" name="barcode" value="{{ item }}">
+                    <button type="submit" class="danger small-btn">Remove</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="muted" id="empty-state">No barcodes scanned on this floor yet.</p>
+      <div class="table-wrap hidden" id="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Barcode</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="items-body"></tbody>
+        </table>
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+<script>
+  const form = document.getElementById("scan-form");
+  const input = document.getElementById("scan-input");
+  const message = document.getElementById("scan-message");
+  const itemsBody = document.getElementById("items-body");
+  const totalCount = document.getElementById("total-count");
+  const emptyState = document.getElementById("empty-state");
+  const tableWrap = document.getElementById("table-wrap");
+
+  function escapeHtml(value) {
+    return value
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function updateRowNumbers() {
+    document.querySelectorAll("#items-body .row-number").forEach((cell, index) => {
+      cell.textContent = index + 1;
+    });
+  }
+
+  form.addEventListener("submit", async function (event) {
+    event.preventDefault();
+
+    const barcode = input.value.trim();
+    if (!barcode) {
+      message.textContent = "Please scan or type a barcode first.";
+      message.className = "scan-message error";
+      return;
+    }
+
+    try {
+      const response = await fetch("{{ url_for('scan_item', floor_id=floor['id']) }}", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ barcode })
+      });
+
+      const data = await response.json();
+
+      if (data.status === "success") {
+        if (emptyState) {
+          emptyState.classList.add("hidden");
+        }
+        if (tableWrap) {
+          tableWrap.classList.remove("hidden");
+        }
+
+        const safeBarcode = escapeHtml(data.barcode);
+        const row = document.createElement("tr");
+        row.setAttribute("data-barcode", data.barcode);
+        row.innerHTML = `
+          <td class="row-number">1</td>
+          <td><code>${safeBarcode}</code></td>
+          <td>
+            <form method="post" action="{{ url_for('delete_item', floor_id=floor['id']) }}" onsubmit="return confirm('Remove barcode ${safeBarcode} from {{ floor['name'] }}?');">
+              <input type="hidden" name="barcode" value="${safeBarcode}">
+              <button type="submit" class="danger small-btn">Remove</button>
+            </form>
+          </td>
+        `;
+        itemsBody.prepend(row);
+        updateRowNumbers();
+
+        totalCount.textContent = data.total_items;
+        message.textContent = `Saved: ${data.barcode}`;
+        message.className = "scan-message success";
+      } else if (data.status === "duplicate") {
+        message.textContent = `Duplicate: ${data.barcode} is already saved on this floor.`;
+        message.className = "scan-message warning";
+      } else {
+        message.textContent = data.message || "Error while saving the barcode.";
+        message.className = "scan-message error";
+      }
+    } catch (error) {
+      message.textContent = "Connection error while saving the barcode.";
+      message.className = "scan-message error";
+    }
+
+    input.value = "";
+    input.focus();
+  });
+
+  input.focus();
+</script>
+{% endblock %}

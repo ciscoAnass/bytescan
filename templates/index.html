@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Floors | Barcode Inventory{% endblock %}
+{% block content %}
+<section class="grid two-col">
+  <div class="card">
+    <h1>Create a floor</h1>
+    <p class="muted">Examples: Floor 0, Floor 1, Floor 7, Floor 9</p>
+    <form method="post" action="{{ url_for('create_floor') }}" class="stack-gap">
+      <label for="floor_name">Floor name</label>
+      <input id="floor_name" name="floor_name" type="text" placeholder="Floor 7" required>
+      <button type="submit">Create floor</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Overview</h2>
+    <div class="stats">
+      <div class="stat-box">
+        <div class="stat-number">{{ floors|length }}</div>
+        <div class="muted">Floor(s)</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-number">{{ total_items }}</div>
+        <div class="muted">Total unique barcode(s)</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Your floors</h2>
+  {% if floors %}
+    <div class="floor-list">
+      {% for floor in floors %}
+        <a class="floor-row" href="{{ url_for('floor_detail', floor_id=floor['id']) }}">
+          <div>
+            <strong>{{ floor['name'] }}</strong>
+            <div class="muted">{{ floor['items']|length }} unique item(s)</div>
+          </div>
+          <span>Open →</span>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="muted">No floors created yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,6 +1,6 @@
 # Barcode Inventory App
 
-Local Flask app to track monitors or any barcoded items by floor.
+Local Flask app to track monitors or any barcoded items by floor/department/...
 
 ## Features
 - Create floors
